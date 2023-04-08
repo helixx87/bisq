@@ -50,12 +50,14 @@ import java.nio.file.Paths;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 import java.util.Date;
 
 import javax.annotation.Nullable;
 
 import static bisq.desktop.util.FormBuilder.*;
+import static java.lang.String.format;
 
 @FxmlView
 public class BackupView extends ActivatableView<GridPane, Void> {
@@ -141,6 +143,21 @@ public class BackupView extends ActivatableView<GridPane, Void> {
         openFileOrShowWarning(openLogsButton, logFile);
 
         refreshDataDirButton.setOnAction(event -> {
+            new Popup()
+                    .maxMessageLength(2500)
+                    .warning(Res.get("account.backup.refreshDirectoryWarning"))
+                    .onAction(() -> {
+                        try {
+                            File backupDataDir = new File(dataDir.getParent(), dataDir.getName() + ".old");
+                            dataDir.renameTo(backupDataDir);
+                            Config.mkAppDataDir(dataDir);
+                            FileUtil.copyDirectory(dataDir, backupDataDir);
+                            Utilities.openFile(backupDataDir);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("An error ocurred during refreshing data directory", e);
+                        }
+                    })
+                    .show();
             // TODO:
         });
 

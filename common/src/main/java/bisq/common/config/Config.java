@@ -915,7 +915,7 @@ public class Config {
      * nothing if the directory already exists.
      * @return the given directory, now guaranteed to exist
      */
-    private static File mkAppDataDir(File dir) {
+    public static File mkAppDataDir(File dir) {
         if (!dir.exists()) {
             try {
                 Files.createDirectories(dir.toPath());
