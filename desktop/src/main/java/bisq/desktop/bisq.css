@@ -2130,6 +2130,32 @@ textfield */
     -fx-font-family: "IBM Plex Sans";
 }
 
+#advanced-balance-combo, #advanced-balance-combo > * {
+    -fx-opacity: 1 !important;
+    -fx-text-fill: #ffffff !important;
+}
+
+#advanced-balance-combo {
+    -fx-background-color: none;
+}
+
+#advanced-balance-combo > .list-cell {
+    -fx-text-fill: -bs-text-color;
+    -fx-font-family: "IBM Plex Sans";
+}
+
+.hide-chevron .arrow-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.hide-chevron .arrow {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 0;
+    -fx-shape: "";
+}
+
 #invert-market-price {
     -fx-text-fill: -bs-color-gray-11;
 }
