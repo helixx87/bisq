@@ -38,6 +38,7 @@ import bisq.desktop.main.overlays.popups.Popup;
 import bisq.desktop.main.overlays.windows.TorNetworkSettingsWindow;
 import bisq.desktop.main.portfolio.PortfolioView;
 import bisq.desktop.main.settings.SettingsView;
+import bisq.desktop.main.shared.BalanceComboBoxItem;
 import bisq.desktop.main.shared.PriceFeedComboBoxItem;
 import bisq.desktop.main.support.SupportView;
 import bisq.desktop.util.DisplayUtils;
@@ -77,6 +78,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -96,6 +98,11 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
+
+import javafx.event.EventHandler;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 import javafx.util.Duration;
 
@@ -165,6 +172,8 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
     private final DaoStateMonitoringService daoStateMonitoringService;
     private final TorNetworkSettingsWindow torNetworkSettingsWindow;
 
+    private final DecimalFormat currencyFormat;
+
     @Inject
     public MainView(MainViewModel model,
                     CachingViewLoader viewLoader,
@@ -178,6 +187,11 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         MainView.transitions = transitions;
         this.torNetworkSettingsWindow = torNetworkSettingsWindow;
         this.daoStateMonitoringService = daoStateMonitoringService;
+
+        Locale locale = GlobalSettings.getLocale();
+        currencyFormat = (DecimalFormat) NumberFormat.getNumberInstance(locale);
+        currencyFormat.setMinimumFractionDigits(2);
+        currencyFormat.setMaximumFractionDigits(2);
     }
 
     @Override
@@ -202,11 +216,6 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         JFXBadge settingsButtonWithBadge = new JFXBadge(settingsButton);
         JFXBadge accountButtonWithBadge = new JFXBadge(accountButton);
         JFXBadge daoButtonWithBadge = new JFXBadge(daoButton);
-
-        Locale locale = GlobalSettings.getLocale();
-        DecimalFormat currencyFormat = (DecimalFormat) NumberFormat.getNumberInstance(locale);
-        currencyFormat.setMinimumFractionDigits(2);
-        currencyFormat.setMaximumFractionDigits(2);
 
         root.sceneProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
@@ -249,81 +258,16 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         model.getSelectedPriceFeedComboBoxItemProperty().addListener(selectedPriceFeedItemListener);
         priceComboBox.setItems(model.getPriceFeedComboBoxItems());
 
-        Tuple2<Label, VBox> availableBalanceBox = getBalanceBox(Res.get("mainView.balance.available"));
-        availableBalanceBox.first.textProperty().bind(model.getAvailableBalance());
-        availableBalanceBox.first.setPrefWidth(100);
-        availableBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
-            {
-                bind(model.getAvailableBalance());
-                bind(model.getMarketPrice());
-            }
+        ComboBox<BalanceComboBoxItem> advancedBalanceBox = getAdvancedBalanceBox();
 
-            @Override
-            protected Tooltip computeValue() {
-                String tooltipText = Res.get("mainView.balance.available");
-                try {
-                    String preferredTradeCurrency = model.getPreferences().getPreferredTradeCurrency().getCode();
-                    double availableBalance = Double.parseDouble(
-                            model.getAvailableBalance().getValue().replace("BTC", ""));
-                    double marketPrice = Double.parseDouble(model.getMarketPrice(preferredTradeCurrency).getValue());
-                    tooltipText += "\n" + currencyFormat.format(availableBalance * marketPrice) +
-                            " " + preferredTradeCurrency;
-                } catch (NullPointerException | NumberFormatException e) {
-                    // Either the balance or market price is not available yet
-                }
-                return new Tooltip(tooltipText);
-            }
-        });
+        VBox reservedBalanceBox = getBalanceBox(Res.get("mainView.balance.reserved.short"), model.getReservedBalance(),
+                Res.get("mainView.balance.reserved"));
 
-        Tuple2<Label, VBox> reservedBalanceBox = getBalanceBox(Res.get("mainView.balance.reserved.short"));
-        reservedBalanceBox.first.textProperty().bind(model.getReservedBalance());
-        reservedBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
-            {
-                bind(model.getReservedBalance());
-                bind(model.getMarketPrice());
-            }
+        VBox lockedBalanceBox = getBalanceBox(Res.get("mainView.balance.locked.short"), model.getLockedBalance(),
+                Res.get("mainView.balance.locked"));
 
-            @Override
-            protected Tooltip computeValue() {
-                String tooltipText = Res.get("mainView.balance.reserved");
-                try {
-                    String preferredTradeCurrency = model.getPreferences().getPreferredTradeCurrency().getCode();
-                    double reservedBalance = Double.parseDouble(
-                            model.getReservedBalance().getValue().replace("BTC", ""));
-                    double marketPrice = Double.parseDouble(model.getMarketPrice(preferredTradeCurrency).getValue());
-                    tooltipText += "\n" + currencyFormat.format(reservedBalance * marketPrice) +
-                            " " + preferredTradeCurrency;
-                } catch (NullPointerException | NumberFormatException e) {
-                    // Either the balance or market price is not available yet
-                }
-                return new Tooltip(tooltipText);
-            }
-        });
-
-        Tuple2<Label, VBox> lockedBalanceBox = getBalanceBox(Res.get("mainView.balance.locked.short"));
-        lockedBalanceBox.first.textProperty().bind(model.getLockedBalance());
-        lockedBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
-            {
-                bind(model.getLockedBalance());
-                bind(model.getMarketPrice());
-            }
-
-            @Override
-            protected Tooltip computeValue() {
-                String tooltipText = Res.get("mainView.balance.locked");
-                try {
-                    String preferredTradeCurrency = model.getPreferences().getPreferredTradeCurrency().getCode();
-                    double lockedBalance = Double.parseDouble(
-                            model.getLockedBalance().getValue().replace("BTC", ""));
-                    double marketPrice = Double.parseDouble(model.getMarketPrice(preferredTradeCurrency).getValue());
-                    tooltipText += "\n" + currencyFormat.format(lockedBalance * marketPrice) +
-                            " " + preferredTradeCurrency;
-                } catch (NullPointerException | NumberFormatException e) {
-                    // Either the balance or market price is not available yet
-                }
-                return new Tooltip(tooltipText);
-            }
-        });
+        VBox bsqBalanceBox = getBalanceBox(Res.get("mainView.balance.bsq.short"), model.getBsqBalance(),
+                Res.get("mainView.balance.bsq"));
 
         HBox primaryNav = new HBox(marketButton, getNavigationSeparator(), buyButton, getNavigationSeparator(),
                 sellButton, getNavigationSeparator(), portfolioButtonWithBadge, getNavigationSeparator(), fundsButton);
@@ -339,13 +283,44 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
 
         secondaryNav.setAlignment(Pos.CENTER);
 
-        HBox priceAndBalance = new HBox(marketPriceBox.second, getNavigationSeparator(), availableBalanceBox.second,
-                getNavigationSeparator(), reservedBalanceBox.second, getNavigationSeparator(), lockedBalanceBox.second);
+        var reservedBalanceBoxPreSeparator = getNavigationSeparator();
+        var lockedBalanceBoxPreSeparator = getNavigationSeparator();
+
+        HBox priceAndBalance = new HBox(marketPriceBox.second, getNavigationSeparator(), advancedBalanceBox,
+                getNavigationSeparator(), reservedBalanceBoxPreSeparator, reservedBalanceBox,
+                lockedBalanceBoxPreSeparator, lockedBalanceBox, getNavigationSeparator(), bsqBalanceBox);
         priceAndBalance.setMaxHeight(41);
 
         priceAndBalance.setAlignment(Pos.CENTER);
         priceAndBalance.setSpacing(9);
         priceAndBalance.getStyleClass().add("nav-price-balance");
+
+        // Create a reusable event handler to consume mouse events
+        EventHandler<MouseEvent> consumeMouseEvents = MouseEvent::consume;
+
+        MainView.getRootContainer().widthProperty().addListener((obs, oldWidth, newWidth) -> {
+            double width = newWidth.doubleValue();
+
+            advancedBalanceBox.getStyleClass().remove("hide-chevron");
+            if (width > 1250) {
+                advancedBalanceBox.getStyleClass().add("hide-chevron");
+                advancedBalanceBox.addEventFilter(MouseEvent.ANY, consumeMouseEvents);
+            } else {
+                advancedBalanceBox.removeEventFilter(MouseEvent.ANY, consumeMouseEvents);
+            }
+
+
+            lockedBalanceBoxPreSeparator.setManaged(width > 1250);
+            lockedBalanceBoxPreSeparator.setVisible(width > 1250);
+            lockedBalanceBox.setManaged(width > 1250);
+            lockedBalanceBox.setVisible(width > 1250);
+
+            reservedBalanceBoxPreSeparator.setManaged(width > 1250);
+            reservedBalanceBoxPreSeparator.setVisible(width > 1250);
+            reservedBalanceBox.setManaged(width > 1250);
+            reservedBalanceBox.setVisible(width > 1250);
+        });
+
 
         HBox navPane = new HBox(primaryNav, secondaryNav, getNavigationSpacer(),
                 priceAndBalance) {{
@@ -458,18 +433,41 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         return spacer;
     }
 
-    private Tuple2<Label, VBox> getBalanceBox(String text) {
+    private VBox getBalanceBox(String text, StringProperty balanceProperty, String tooltipPrefix) {
         Label balanceDisplay = new Label();
         balanceDisplay.getStyleClass().add("nav-balance-display");
 
         Label label = new Label(text);
         label.getStyleClass().add("nav-balance-label");
-        label.maxWidthProperty().bind(balanceDisplay.widthProperty());
         label.setPadding(new Insets(0, 0, 0, 0));
         VBox vBox = new VBox();
         vBox.setAlignment(Pos.CENTER_LEFT);
         vBox.getChildren().addAll(balanceDisplay, label);
-        return new Tuple2<>(balanceDisplay, vBox);
+
+        balanceDisplay.textProperty().bind(balanceProperty);
+        balanceDisplay.tooltipProperty().bind(new ObjectBinding<>() {
+            {
+                bind(balanceProperty);
+                bind(model.getMarketPrice());
+            }
+
+            @Override
+            protected Tooltip computeValue() {
+                String tooltipText = tooltipPrefix;
+                try {
+                    String preferredTradeCurrency = model.getPreferences().getPreferredTradeCurrency().getCode();
+                    double balance = Double.parseDouble(balanceProperty.getValue().replace("BTC", ""));
+                    double marketPrice = Double.parseDouble(model.getMarketPrice(preferredTradeCurrency).getValue());
+                    tooltipText += "\n" + currencyFormat.format(balance * marketPrice) +
+                            " " + preferredTradeCurrency;
+                } catch (NullPointerException | NumberFormatException e) {
+                    // Either the balance or market price is not available yet
+                }
+                return new Tooltip(tooltipText);
+            }
+        });
+
+        return vBox;
     }
 
     private ListCell<PriceFeedComboBoxItem> getPriceFeedComboBoxListCell() {
@@ -517,10 +515,50 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         return new Tuple2<>(priceComboBox, marketPriceBox);
     }
 
-    @NotNull
-    private String getPriceProvider() {
-        return model.getIsFiatCurrencyPriceFeedSelected().get() ? "BitcoinAverage" : "Poloniex";
+    private ListCell<BalanceComboBoxItem> getAdvancedBalanceBoxListCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(BalanceComboBoxItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    Label value = new Label();
+                    value.textProperty().bind(item.getBalanceStringProperty());
+                    Label label = new Label(item.getLabel());
+                    label.getStyleClass().add("nav-balance-label");
+                    setGraphic(new VBox(value, label));
+                }
+            }
+        };
     }
+
+    private ComboBox<BalanceComboBoxItem> getAdvancedBalanceBox() {
+        ComboBox<BalanceComboBoxItem> balanceComboBox = new JFXComboBox<>();
+        balanceComboBox.setFocusTraversable(false);
+        balanceComboBox.setId("advanced-balance-combo");
+        balanceComboBox.setPadding(new Insets(0, -4, -4, 0));
+
+        // Setup items
+        balanceComboBox.setCellFactory(p -> getAdvancedBalanceBoxListCell());
+        balanceComboBox.setItems(FXCollections.observableArrayList(
+                new BalanceComboBoxItem(Res.get("mainView.balance.available"), model.getAvailableBalance()),
+                new BalanceComboBoxItem(Res.get("mainView.balance.reserved.short"), model.getReservedBalance()),
+                new BalanceComboBoxItem(Res.get("mainView.balance.locked.short"), model.getLockedBalance())
+        ));
+        balanceComboBox.getSelectionModel().selectFirst();
+
+        // Setup selected rendering
+        var buttonCell = getAdvancedBalanceBoxListCell();
+        buttonCell.setId("advanced-balance-combo");
+        balanceComboBox.setButtonCell(buttonCell);
+
+        balanceComboBox.setEditable(false);
+
+        return balanceComboBox;
+    }
+
 
     private void updateMarketPriceLabel(Label label) {
         if (model.getIsPriceAvailable().get()) {
