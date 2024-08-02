@@ -2149,6 +2149,10 @@ textfield */
     -fx-font-family: "IBM Plex Sans";
 }
 
+#advanced-balance-combo .combo-box-popup {
+    -fx-padding: 80 0 0 0;
+}
+
 .hide-chevron .arrow-button {
     -fx-background-color: transparent;
     -fx-padding: 0;

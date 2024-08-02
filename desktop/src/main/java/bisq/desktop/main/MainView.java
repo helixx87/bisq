@@ -258,7 +258,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         model.getSelectedPriceFeedComboBoxItemProperty().addListener(selectedPriceFeedItemListener);
         priceComboBox.setItems(model.getPriceFeedComboBoxItems());
 
-        ComboBox<BalanceComboBoxItem> advancedBalanceBox = getAdvancedBalanceBox();
+        Tuple2<ComboBox<BalanceComboBoxItem>, VBox> advancedBalanceBox = getAdvancedBalanceBox();
 
         VBox reservedBalanceBox = getBalanceBox(Res.get("mainView.balance.reserved.short"), model.getReservedBalance(),
                 Res.get("mainView.balance.reserved"));
@@ -286,7 +286,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         var reservedBalanceBoxPreSeparator = getNavigationSeparator();
         var lockedBalanceBoxPreSeparator = getNavigationSeparator();
 
-        HBox priceAndBalance = new HBox(marketPriceBox.second, getNavigationSeparator(), advancedBalanceBox,
+        HBox priceAndBalance = new HBox(marketPriceBox.second, getNavigationSeparator(), advancedBalanceBox.second,
                 getNavigationSeparator(), reservedBalanceBoxPreSeparator, reservedBalanceBox,
                 lockedBalanceBoxPreSeparator, lockedBalanceBox, getNavigationSeparator(), bsqBalanceBox);
         priceAndBalance.setMaxHeight(41);
@@ -301,12 +301,12 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         MainView.getRootContainer().widthProperty().addListener((obs, oldWidth, newWidth) -> {
             double width = newWidth.doubleValue();
 
-            advancedBalanceBox.getStyleClass().remove("hide-chevron");
+            advancedBalanceBox.second.getStyleClass().remove("hide-chevron");
             if (width > 1250) {
-                advancedBalanceBox.getStyleClass().add("hide-chevron");
-                advancedBalanceBox.addEventFilter(MouseEvent.ANY, consumeMouseEvents);
+                advancedBalanceBox.second.getStyleClass().add("hide-chevron");
+                advancedBalanceBox.second.addEventFilter(MouseEvent.ANY, consumeMouseEvents);
             } else {
-                advancedBalanceBox.removeEventFilter(MouseEvent.ANY, consumeMouseEvents);
+                advancedBalanceBox.second.removeEventFilter(MouseEvent.ANY, consumeMouseEvents);
             }
 
 
@@ -515,6 +515,39 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         return new Tuple2<>(priceComboBox, marketPriceBox);
     }
 
+    private void updateMarketPriceLabel(Label label) {
+        if (model.getIsPriceAvailable().get()) {
+            if (model.getIsExternallyProvidedPrice().get()) {
+                label.setText(Res.get("mainView.marketPriceWithProvider.label", "Bisq Price Index"));
+                label.setTooltip(new Tooltip(getPriceProviderTooltipString()));
+            } else {
+                label.setText(Res.get("mainView.marketPrice.bisqInternalPrice"));
+                final Tooltip tooltip = new Tooltip(Res.get("mainView.marketPrice.tooltip.bisqInternalPrice"));
+                label.setTooltip(tooltip);
+            }
+        } else {
+            label.setText("");
+            label.setTooltip(null);
+        }
+    }
+
+    private ListCell<BalanceComboBoxItem> getAdvancedBalanceBoxButtonCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(BalanceComboBoxItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                } else {
+                    Label value = new Label();
+                    value.textProperty().bind(item.getBalanceStringProperty());
+                    setGraphic(value);
+                }
+            }
+        };
+    }
+
     private ListCell<BalanceComboBoxItem> getAdvancedBalanceBoxListCell() {
         return new ListCell<>() {
             @Override
@@ -534,7 +567,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         };
     }
 
-    private ComboBox<BalanceComboBoxItem> getAdvancedBalanceBox() {
+    private Tuple2<ComboBox<BalanceComboBoxItem>, VBox> getAdvancedBalanceBox() {
         ComboBox<BalanceComboBoxItem> balanceComboBox = new JFXComboBox<>();
         balanceComboBox.setFocusTraversable(false);
         balanceComboBox.setId("advanced-balance-combo");
@@ -550,30 +583,20 @@ public class MainView extends InitializableView<StackPane, MainViewModel>
         balanceComboBox.getSelectionModel().selectFirst();
 
         // Setup selected rendering
-        var buttonCell = getAdvancedBalanceBoxListCell();
+        var buttonCell = getAdvancedBalanceBoxButtonCell();
         buttonCell.setId("advanced-balance-combo");
         balanceComboBox.setButtonCell(buttonCell);
 
         balanceComboBox.setEditable(false);
 
-        return balanceComboBox;
-    }
+        Label advancedBalanceLabel = new Label(Res.get("mainView.balance.available"));
+        advancedBalanceLabel.getStyleClass().add("nav-balance-label");
+        advancedBalanceLabel.setPadding(new Insets(-2, 0, 4, 9));
 
+        VBox advancedBalanceBox = new VBox(balanceComboBox, advancedBalanceLabel);
+        advancedBalanceBox.setAlignment(Pos.CENTER_LEFT);
 
-    private void updateMarketPriceLabel(Label label) {
-        if (model.getIsPriceAvailable().get()) {
-            if (model.getIsExternallyProvidedPrice().get()) {
-                label.setText(Res.get("mainView.marketPriceWithProvider.label", "Bisq Price Index"));
-                label.setTooltip(new Tooltip(getPriceProviderTooltipString()));
-            } else {
-                label.setText(Res.get("mainView.marketPrice.bisqInternalPrice"));
-                final Tooltip tooltip = new Tooltip(Res.get("mainView.marketPrice.tooltip.bisqInternalPrice"));
-                label.setTooltip(tooltip);
-            }
-        } else {
-            label.setText("");
-            label.setTooltip(null);
-        }
+        return new Tuple2<>(balanceComboBox, advancedBalanceBox);
     }
 
     @NotNull
